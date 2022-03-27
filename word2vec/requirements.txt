@@ -1,0 +1,4 @@
+treelib==1.6.1
+torch==1.11.0
+tqdm==4.63.1
+gensim==4.1.2
