@@ -1,1 +1,6 @@
-# nlp_torchtext
+# nlp
+
+- word2vec 
+- transformer
+- bert
+
