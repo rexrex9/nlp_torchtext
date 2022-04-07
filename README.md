@@ -1,6 +1,6 @@
 # nlp
 
 - word2vec 
-- transformer
-- bert
+- transformer #制作中
+- bert #制作中
 
