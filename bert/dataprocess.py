@@ -85,9 +85,9 @@ def getMlmData(tokenss,vocab_set):
 def getPreData(data):
     vocab_dict, vacab_set = getVocabs(seqs)
     nsp_data, nsp_Y = getNspData(data) #生成nsp任务的文本数据
-    tokenss, segmentss = getTokensAndSegments(nsp_data) #生成bert所需输入
+    tokenss, segmentss = getTokensAndSegments(nsp_data) #生成bert encoder所需输入
     tokenss, mlm_true_wordss, mlm_pred_positionss = getMlmData(tokenss,vacab_set) #生成mlm任务的文本数据
-    tokenss,mlm_Y = mapping(tokenss,mlm_true_wordss,vocab_dict)
+    tokenss, mlm_Y = mapping(tokenss,mlm_true_wordss,vocab_dict) #映射成索引
     return tokenss,segmentss,mlm_pred_positionss,nsp_Y,mlm_Y,vocab_dict
 
 seqs = [[['i','b','c','d','e','f'],['a','m','c','f','j','g']],

@@ -19,11 +19,13 @@ class Dataset(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.tokenss)
 
+
 def train(epochs = 10,batchSize=2):
     tokenss, segmentss, mlm_pred_positionss, nsp_Y, mlm_Y, vocab_dict = dp.getPreData(dp.seqs)
+
     dataSet = Dataset(tokenss, segmentss, mlm_pred_positionss, nsp_Y, mlm_Y)
-    net = model.BERTModel(vocab_size=len(vocab_dict), e_dim=32, transformer_h_dim=32, mlm_h_dim=32, n_heads=3, n_layers=12,
-                    max_len=128)
+    net = model.BERTModel(vocab_size=len(vocab_dict), e_dim=32, transformer_h_dim=32,
+                          mlm_h_dim=32, n_heads=3, n_layers=12, max_len=128)
     optimizer = torch.optim.Adam(net.parameters(), lr=0.01)
     criterion = torch.nn.CrossEntropyLoss()
     for e in range(epochs):
@@ -34,10 +36,13 @@ def train(epochs = 10,batchSize=2):
             mlm_Y = mlm_Y.reshape(-1)
             mlm_loss = criterion(mlm_Y_hat,mlm_Y)
             nsp_loss = criterion(nsp_Y_hat,nsp_Y)
-            loss = mlm_loss+nsp_loss
+            loss = mlm_loss + nsp_loss
             loss.backward()
             optimizer.step()
         print('epoch {}, loss = {:.4f}'.format(e,loss))
 
 if __name__ == '__main__':
+    '''
+        该示例代码未考虑padding,如要考虑padding则用<pad>填充，并记录valid_lens(实际长度)方便并行计算。
+    '''
     train()

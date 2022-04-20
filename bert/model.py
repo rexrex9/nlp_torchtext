@@ -1,5 +1,6 @@
 from torch import nn
 import torch
+from torch.nn import functional as F
 from transformer.transformer import EncoderLayer
 
 class BERTEncoder(nn.Module):
@@ -33,7 +34,8 @@ class MaskLM(nn.Module):
         self.mlp = nn.Sequential(nn.Linear(e_dim, h_dim),
                                  nn.ReLU(),
                                  nn.LayerNorm(h_dim),
-                                 nn.Linear(h_dim, vocab_size))
+                                 nn.Linear(h_dim, vocab_size),
+                                 nn.Softmax())
 
     def forward(self, X, pred_positions):
         num_pred_positions = pred_positions.shape[1]
@@ -53,7 +55,7 @@ class NextSentencePred(nn.Module):
         self.output = nn.Linear(e_dim, 2)
 
     def forward(self, X):
-        return self.output(X)
+        return F.softmax(self.output(X))
 
 class BERTModel(nn.Module):
 
@@ -75,10 +77,8 @@ class BERTModel(nn.Module):
 
     def forward(self, tokens, segments, pred_positions=None):
         encoded_X = self.encoder(tokens, segments)
-        if pred_positions is not None:
-            mlm_Y_hat = self.mlm(encoded_X, pred_positions)
-        else:
-            mlm_Y_hat = None
+
+        mlm_Y_hat = self.mlm(encoded_X, pred_positions)
         nsp_Y_hat = self.nsp(encoded_X[:, 0, :])
         return encoded_X, mlm_Y_hat, nsp_Y_hat
 
@@ -89,6 +89,7 @@ if __name__ == '__main__':
     segments = torch.cat([torch.zeros(batch_size,7,dtype=int),torch.ones(batch_size,5,dtype=int)],dim=1)
     pred_positions = torch.randint(0,12,(batch_size,3))
     encoded_X, mlm_Y_hat, nsp_Y_hat = net(tokens,segments,pred_positions)
+
     print(encoded_X.shape)
     print(mlm_Y_hat.shape)
     print(nsp_Y_hat.shape)
