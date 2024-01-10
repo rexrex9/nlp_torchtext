@@ -16,10 +16,10 @@ class MultiHeadAttentionLayer( nn.Module ):
         self.atte_layers = nn.ModuleList([ OneHeadAttention( e_dim, h_dim ) for _ in range( n_heads ) ] )
         self.l = nn.Linear( h_dim * n_heads, e_dim)
 
-    def forward( self, seq_inputs, querys = None, mask = None ):
+    def forward(self, seq_inputs, encoder_input = None, mask = None):
         outs = []
         for one in self.atte_layers:
-            out = one( seq_inputs, querys, mask )
+            out = one(seq_inputs, encoder_input, mask)
             outs.append( out )
         # [ batch, seq_lens, h_dim * n_heads ]
         outs = torch.cat( outs, dim=-1 )
@@ -43,20 +43,21 @@ class OneHeadAttention( nn.Module ):
         self.lK = nn.Linear( e_dim, h_dim )
         self.lV = nn.Linear( e_dim, h_dim )
 
-    def forward( self, seq_inputs , querys = None, mask = None ):
+    def forward(self, seq_inputs, encoder_input = None, mask = None):
         '''
         :param seq_inputs: #[ batch, seq_lens, e_dim ]
-        :param querys: #[ batch, seq_lens, e_dim ]
+        :param encoder_input: #[ batch, seq_lens, e_dim ]
         :param mask: #[ 1, seq_lens, seq_lens ]
         :return:
         '''
-        # 如果有encoder的输出, 则映射该张量，否则还是就是自注意力的逻辑
-        if querys is not None:
-            Q = self.lQ( querys ) #[ batch, seq_lens, h_dim ]
+        Q = self.lQ(seq_inputs) #[ batch, seq_lens, h_dim ]
+        # 如果有encoder的输出, 则使用encoder的输出来计算键矩阵(K)和值矩阵(V)，否则还是就是自注意力的逻辑
+        if encoder_input is not None:
+            K = self.lK(encoder_input) #[ batch, seq_lens, h_dim ]
+            V = self.lV(encoder_input) #[ batch, seq_lens, h_dim ]
         else:
-            Q =  self.lQ( seq_inputs ) #[ batch, seq_lens, h_dim ]
-        K = self.lK( seq_inputs ) #[ batch, seq_lens, h_dim ]
-        V = self.lV( seq_inputs ) #[ batch, seq_lens, h_dim ]
+            K = self.lK(seq_inputs)  # [ batch, seq_lens, h_dim ]
+            V = self.lV(seq_inputs)  # [ batch, seq_lens, h_dim ]
         # [ batch, seq_lens, seq_lens ]
         QK = torch.matmul( Q,K.permute( 0, 2, 1 ) )
         # [ batch, seq_lens, seq_lens ]
@@ -204,10 +205,10 @@ class DecoderLayer(nn.Module):
 
         self.drop_out = nn.Dropout( drop_rate )
 
-    def forward( self, seq_inputs , querys, mask ):
+    def forward(self, seq_inputs, encoder_input, mask):
         '''
         :param seq_inputs: [ batch, seqs_len, e_dim ]
-        :param querys: encoder的输出
+        :param encoder_input: encoder的输出
         :param mask: 遮盖位置的标注序列 [ 1, seqs_len, seqs_len ]
         '''
         # 自注意力层, 输出维度[ batch, seq_lens, e_dim ]
@@ -215,7 +216,7 @@ class DecoderLayer(nn.Module):
         # 残差连与LN, 输出维度[ batch, seq_lens, e_dim ]
         outs = self.sa_LN( seq_inputs + self.drop_out( outs_ ) )
         # 交互注意力层, 输出维度[ batch, seq_lens, e_dim ]
-        outs_ = self.interactive_attention( outs, querys )
+        outs_ = self.interactive_attention(outs, encoder_input)
         # 残差连与LN, 输出维度[ batch, seq_lens, e_dim
         outs = self.ia_LN( outs + self.drop_out(outs_) )
         # 前馈神经网络, 输出维度[ batch, seq_lens, e_dim ]
@@ -248,10 +249,10 @@ class TransformerDecoder(nn.Module):
         self.softmax = nn.Softmax()
 
 
-    def forward( self, seq_inputs, querys ):
+    def forward(self, seq_inputs, encoder_input):
         '''
         :param seq_inputs: 已经经过Embedding层的张量，维度是[ batch, seq_lens, dim ]
-        :param querys: encoder的输出，维度是[ batch, seq_lens, dim ]
+        :param encoder_input: encoder的输出，维度是[ batch, seq_lens, dim ]
         :return: 与输入张量维度一样的张量，维度是[ batch, seq_lens, dim ]
         '''
         # 先进行位置编码
@@ -260,7 +261,7 @@ class TransformerDecoder(nn.Module):
         mask = subsequent_mask( seq_inputs.shape[1] )
         # 输入进N个“解码层”中开始传播
         for layer in self.decoder_layers:
-            seq_inputs = layer( seq_inputs, querys, mask )
+            seq_inputs = layer(seq_inputs, encoder_input, mask)
         # 最终线性变化后Softmax归一化
         seq_outputs = self.softmax(self.linear(seq_inputs))
         return seq_outputs
